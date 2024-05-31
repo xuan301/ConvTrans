@@ -17,6 +17,7 @@ def load(config):
     if os.path.exists(config['data_dir'] + '/' + problem + '.npy'):
         logger.info("Loading preprocessed data ...")
         Data_npy = np.load(config['data_dir'] + '/' + problem + '.npy', allow_pickle=True)
+        logger.info("Data Path: {}".format(config['data_dir'] + '/' + problem + '.npy'))
 
         Data['max_len'] = Data_npy.item().get('max_len')
         Data['All_train_data'] = Data_npy.item().get('All_train_data')

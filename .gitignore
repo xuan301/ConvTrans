@@ -1,0 +1,10 @@
+# Ignore Python bytecode files
+__pycache__/
+*.py[cod]
+*.pyo
+summary/
+Results/
+LOG
+Dataset/UEA_backup/
+Dataset/__pycache__/
+Models/__pycache__/
