@@ -10,6 +10,9 @@ from torch.utils.tensorboard import SummaryWriter
 from Models.loss import l2_reg_loss
 from Models import utils, analysis
 
+import torch.optim as optim
+from torch.cuda.amp import GradScaler, autocast
+
 logger = logging.getLogger('__main__')
 
 NEG_METRICS = {'loss'}  # metrics for which "better" is less
@@ -73,28 +76,34 @@ class SupervisedTrainer(BaseTrainer):
         epoch_loss = 0  # total loss of epoch
         total_samples = 0  # total samples in epoch
 
+        scaler = GradScaler()
+
         for i, batch in enumerate(self.dataloader):
 
             X, targets, IDs = batch
             targets = targets.to(self.device)
-            predictions = self.model(X.to(self.device))
 
-            loss = self.loss_module(predictions, targets)  # (batch_size,) loss for each sample in the batch
-            batch_loss = torch.sum(loss)
-            mean_loss = batch_loss / len(loss)  # mean loss (over samples) used for optimization
-
-            if self.l2_reg:
-                total_loss = mean_loss + self.l2_reg * l2_reg_loss(self.model)
-            else:
-                total_loss = mean_loss
-
-            # Zero gradients, perform a backward pass, and update the weights.
             self.optimizer.zero_grad()
-            total_loss.backward()
+
+            with autocast():
+                predictions = self.model(X.to(self.device))
+
+                loss = self.loss_module(predictions, targets)  # (batch_size,) loss for each sample in the batch
+                batch_loss = torch.sum(loss)
+                mean_loss = batch_loss / len(loss)  # mean loss (over samples) used for optimization
+
+                if self.l2_reg:
+                    total_loss = mean_loss + self.l2_reg * l2_reg_loss(self.model)
+                else:
+                    total_loss = mean_loss
+                
+            scaler.scale(total_loss).backward()
 
             # torch.nn.utils.clip_grad_value_(self.model.parameters(), clip_value=1.0)
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=4.0)
-            self.optimizer.step()
+            scaler.step(self.optimizer)
+            scaler.update()
+        
 
             '''
             metrics = {"loss": mean_loss.item()}
@@ -149,9 +158,12 @@ class SupervisedTrainer(BaseTrainer):
         predictions = torch.from_numpy(np.concatenate(per_batch['predictions'], axis=0))
         probs = torch.nn.functional.softmax(predictions,dim=1)  # (total_samples, num_classes) est. prob. for each class and sample
         predictions = torch.argmax(probs, dim=1).cpu().numpy()  # (total_samples,) int class index for each sample
+        print("predictions: ", predictions)
         probs = probs.cpu().numpy()
         targets = np.concatenate(per_batch['targets'], axis=0).flatten()
+        # print("targets: ", targets)
         class_names = np.arange(probs.shape[1])  # TODO: temporary until I decide how to pass class names
+        print("class_names: ", class_names)
         metrics_dict = self.analyzer.analyze_classification(predictions, targets, class_names)
 
         self.epoch_metrics['accuracy'] = metrics_dict['total_accuracy']  # same as average recall over all classes
@@ -223,11 +235,14 @@ def train_runner(config, model, trainer, val_evaluator, path):
     save_best_model = utils.SaveBestModel()
     # save_best_acc_model = utils.SaveBestACCModel()
 
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=10, verbose=True)
+
     for epoch in tqdm(range(start_epoch + 1, epochs + 1), desc='Training Epoch', leave=False):
 
         aggr_metrics_train = trainer.train_epoch(epoch)  # dictionary of aggregate epoch metrics
         aggr_metrics_val, best_metrics, best_value = validate(val_evaluator, tensorboard_writer, config, best_metrics,
                                                               best_value, epoch)
+        scheduler.step(aggr_metrics_val['loss'])
         save_best_model(aggr_metrics_val['loss'], epoch, model, optimizer, loss_module, path)
         # save_best_acc_model(aggr_metrics_val['accuracy'], epoch, model, optimizer, loss_module, path)
 

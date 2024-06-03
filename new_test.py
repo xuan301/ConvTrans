@@ -64,12 +64,8 @@ if __name__ == '__main__':
         # ------------------------------------ Load Data ---------------------------------------------------------------
         logger.info("Loading Data ...")
         Data = Data_Loader(config)
-        train_dataset = dataset_class(Data['train_data'], Data['train_label'])
-        val_dataset = dataset_class(Data['val_data'], Data['val_label'])
         test_dataset = dataset_class(Data['test_data'], Data['test_label'])
 
-        train_loader = DataLoader(dataset=train_dataset, batch_size=config['batch_size'], shuffle=True, pin_memory=True)
-        val_loader = DataLoader(dataset=val_dataset, batch_size=config['batch_size'], shuffle=True, pin_memory=True)
         test_loader = DataLoader(dataset=test_dataset, batch_size=config['batch_size'], shuffle=True, pin_memory=True)
         # --------------------------------------------------------------------------------------------------------------
         # -------------------------------------------- Build Model -----------------------------------------------------
@@ -90,13 +86,7 @@ if __name__ == '__main__':
         model.to(device)
         # ---------------------------------------------- Training The Model ------------------------------------
         logger.info('Starting training...')
-        trainer = SupervisedTrainer(model, train_loader, device, config['loss_module'], config['optimizer'], l2_reg=0,
-                                    print_interval=config['print_interval'], console=config['console'], print_conf_mat=False)
-        val_evaluator = SupervisedTrainer(model, val_loader, device, config['loss_module'],
-                                          print_interval=config['print_interval'], console=config['console'],
-                                          print_conf_mat=False)
-
-        train_runner(config, model, trainer, val_evaluator, save_path)
+        save_path = f"/home/v-liuwenxuan/timeser/ConvTran/Results/Dataset/UEA/2024-06-03_11-37/checkpoints/ProcessedDatamodel_last.pth"
         best_model, optimizer, start_epoch = load_model(model, save_path, config['optimizer'])
         best_model.to(device)
 
@@ -104,6 +94,8 @@ if __name__ == '__main__':
                                                 print_interval=config['print_interval'], console=config['console'],
                                                 print_conf_mat=True)
         best_aggr_metrics_test, all_metrics = best_test_evaluator.evaluate(keep_all=True)
+        print("Test Length: ", len(test_loader))
+        print("Test Metrics: ", all_metrics)
         print_str = 'Best Model Test Summary: '
         for k, v in best_aggr_metrics_test.items():
             print_str += '{}: {} | '.format(k, v)

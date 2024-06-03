@@ -1,51 +1,3 @@
-# 项目名称
-
-本项目用于处理时间序列数据并进行相关分析和建模。
-
-## 环境设置
-
-1. 创建并激活 Conda 环境：
-    ```bash
-    conda create -n timeser python=3.8
-    conda activate timeser
-    ```
-
-2. 安装依赖包：
-    ```bash
-    pip install -r requirements.txt
-    pip install openpyxl
-    pip install imbalanced-learn
-    ```
-
-## 生成数据集
-
-1. 进入 `process_data` 目录：
-    ```bash
-    cd process_data
-    ```
-
-2. 新建 `outputs` 文件夹，并将各个类别的数据文件放入该文件夹：
-    ```bash
-    mkdir outputs
-    # 将各个类别的数据文件放入 outputs 文件夹
-    ```
-
-3. 运行数据集生成脚本：
-    ```bash
-    python generate_dataset.py
-    ```
-
-4. 将生成的 `ProcessedData` 文件夹复制到 `Dataset/UEA/Multivariate_ts` 目录下：
-    ```bash
-    cp -r ProcessedData ../Dataset/UEA/Multivariate_ts
-    ```
-
-## 运行主程序
-
-进入项目根目录，运行主程序：
-```bash
-python main.py
-```
 
 ## 建立模型
 
@@ -257,18 +209,3 @@ self.out = nn.Linear(emb_size, num_classes)
 
 如图4所示，在卷积层的第一步中，应用M个时间滤波器到输入数据。在这一步中，模型提取输入序列中的时间模式。接下来，时间滤波后的输出与形状为 \(d_{model} \times dx \times M\) 的空间滤波器卷积，以捕捉多变量时间序列中变量之间的相关性，并构建 \(d_{model}\) 大小的输入嵌入。这种分离的时间和空间卷积类似于“Sandler等（2018）”中的“倒瓶颈”。它首先扩展输入通道的数量，然后压缩它们。选择这个架构的关键原因是Transformer中的前馈网络（FFN）也扩展了输入大小，然后将扩展的隐藏状态投射回原始大小，以捕捉空间交互。
 
-# 优化点
-## 1. 数据重采样形成非平衡数据集
-原先的正常数据集较少，不符合正常分布，因此使用Smote重采样形成非平衡数据集
-
-## 2. Focal Loss
-原先的交叉熵损失函数对于非平衡数据集的分类效果不佳，因此使用Focal Loss进行改进
-
-## 3. 调整学习率
-使用ReduceLROnPlateau，相比较原先的固定学习率，可以更好地调整学习率，提高模型的收敛速度和性能
-
-## 4. 更多的正则化
-在模型中加入更多的正则化项，如Dropout等，以防止过拟合
-
-## 5. 混合精度
-使用混合精度训练，可以加速训练过程，提高模型性能

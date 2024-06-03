@@ -8,3 +8,5 @@ LOG
 Dataset/UEA_backup/
 Dataset/__pycache__/
 Models/__pycache__/
+Dataset/UEA/
+process_data/old_data/
