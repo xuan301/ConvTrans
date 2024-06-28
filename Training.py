@@ -222,6 +222,11 @@ def validate(val_evaluator, tensorboard_writer, config, best_metrics, best_value
     return aggr_metrics, best_metrics, best_value
 
 
+import csv
+import time
+from tqdm import tqdm
+from torch.utils.tensorboard import SummaryWriter
+
 def train_runner(config, model, trainer, val_evaluator, path):
     epochs = config['epochs']
     optimizer = config['optimizer']
@@ -237,8 +242,12 @@ def train_runner(config, model, trainer, val_evaluator, path):
 
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=10, verbose=True)
 
-    for epoch in tqdm(range(start_epoch + 1, epochs + 1), desc='Training Epoch', leave=False):
+    # 创建CSV文件并写入标题行
+    with open('training_metrics.csv', mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(['Epoch', 'Training Loss', 'Training Accuracy', 'Validation Loss', 'Validation Accuracy'])
 
+    for epoch in tqdm(range(start_epoch + 1, epochs + 1), desc='Training Epoch', leave=False):
         aggr_metrics_train = trainer.train_epoch(epoch)  # dictionary of aggregate epoch metrics
         aggr_metrics_val, best_metrics, best_value = validate(val_evaluator, tensorboard_writer, config, best_metrics,
                                                               best_value, epoch)
@@ -248,6 +257,17 @@ def train_runner(config, model, trainer, val_evaluator, path):
 
         metrics_names, metrics_values = zip(*aggr_metrics_val.items())
         metrics.append(list(metrics_values))
+
+        # 记录每个epoch的指标到CSV文件
+        with open('training_metrics.csv', mode='a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow([
+                epoch,
+                aggr_metrics_train.get('loss', float('nan')),
+                aggr_metrics_train.get('accuracy', float('nan')),
+                aggr_metrics_val.get('loss', float('nan')),
+                aggr_metrics_val.get('accuracy', float('nan'))
+            ])
 
         print_str = 'Epoch {} Training Summary: '.format(epoch)
         for k, v in aggr_metrics_train.items():
